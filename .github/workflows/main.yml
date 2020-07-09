@@ -41,6 +41,6 @@ jobs:
       - name: Print value of Global Environment Variables
         run: |
           echo "Will deploy package: ${{ env.DEPLOY_PACKAGE_NAME }}"
-          echo "Application name: ${{ env.MY_APPLICATION NAME }}"
+          echo "Application name: ${{ env.MY_APPLICATION_NAME }}"
           echo "Environment name: ${{ env.MY_ENVIRONMENT_NAME }}"
         
