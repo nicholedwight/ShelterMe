@@ -1,0 +1,19 @@
+{% extends 'base.html' %}
+
+{% block header %}
+  <h1>{% block title %}All Adoptable Animals{% endblock %}</h1>
+{% endblock %}
+
+{% block content %}
+  <p>All animals will go here</p>
+  <p>Num of animals: {{ count }}</p>
+  <p>STUFF HERE: {{ info_list.ID }}</p>
+
+  {% for pup in pups %}
+    <div>
+      <ul>
+        <li>{{ ID }}</li>
+      </ul>
+    </div>
+  {% endfor %}
+{% endblock %}
