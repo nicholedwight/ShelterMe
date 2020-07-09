@@ -1,46 +1,65 @@
 # This is a basic workflow to help you get started with Actions
 
-name: CI
+name: CI/CD to AWS
+
+env:
+  EB_PACKAGE_S3_BUCKET_NAME: "135588681470-shelter-me"
+  EB_APPLICATION_NAME: "ShelterMe"
+  EB_ENVIRONMENT_NAME: "Shelterme-env"
+  DEPLOY_PACKAGE_NAME: "shelter_me_${{ github.sha }}.zip"
+  AWS_REGION_NAME: "us-west-2"
 
 # Controls when the action will run. Triggers the workflow on push or pull request
 # events but only for the master branch
 on:
   push:
-    branches: [ master ]
-  pull_request:
-    branches: [ master ]
+    branches: 
+    - master
 
 # A workflow run is made up of one or more jobs that can run sequentially or in parallel
 jobs:
-  # This workflow contains a single job called "build"
-  build:
-    # The type of runner that the job will run on
-    runs-on: ubuntu-latest
-
-    # Steps represent a sequence of tasks that will be executed as part of the job
-    steps:
-    # Checks-out your repository under $GITHUB_WORKSPACE, so your job can access it
-    - uses: actions/checkout@v2
-
-    # Runs a single command using the runners shell
-    - name: Run a one-line script
-      run: echo Hello, world!
-
-    # Runs a set of commands using the runners shell
-    - name: Run a multi-line script
-      run: |
-        echo Add other actions to build,
-        echo test, and deploy your project.
-  deploy:
+  ci_part:
     runs-on: ubuntu-latest
     
     steps:
       - name: Git clone our repo
-        uses: actions/checkout@v1
+        uses: actions/checkout@v2
       
-      - name: Print value of Global Environment Variables
-        run: |
-          echo "Will deploy package: ${{ env.DEPLOY_PACKAGE_NAME }}"
-          echo "Application name: ${{ env.MY_APPLICATION_NAME }}"
-          echo "Environment name: ${{ env.MY_ENVIRONMENT_NAME }}"
-        
+      - name: Create ZIP deployment package
+        run: zip -r ${{ env.DEPLOY_PACKAGE_NAME }} ./ -x *.git*
+      
+      - name: Configure my AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v1
+        with:
+          aws-access-key-id: ${{ secrets.MY_AWS_ACCESS_KEY }}
+          aws-secret-access-key: ${{ secrets.MY_AWS_SECRET_KEY }} 
+          aws-region: ${{ env.AWS_REGION_NAME }}
+          
+      - name: Copy Deployment package to S# bucket
+        run: aws s3 cp ${{ env.DEPLOY_PACKAGE_NAME }} s3://${{ env.EB_PACKAGE_S3_BUCKET_NAME }}/
+  
+  cd_part:
+    runs-on: ubuntu-latest
+    needs: [ci_part]
+    
+    steps:
+    - name: Configure my AWS Credentials
+      uses: aws-actions/configure-aws-credentials@v1
+      with:
+        aws-access-key-id: ${{ secrets.MY_AWS_ACCESS_KEY }}
+        aws-secret-access-key: ${{ secrets.MY_AWS_SECRET_KEY }} 
+        aws-region: ${{ env.AWS_REGION_NAME }}
+    
+    - name: Create new ElasticBeanstal Application Version
+      run: |
+        aws elasticbeanstal create-application-version \
+        --application-name ${{ env.EB_APPLICATION_NAME }} \
+        --source-bundle S3Bucket="${{ env.EB_PACKAGE_S3_BUCKET_NAME }}",s#Key="${{ env.DEPLOY_PACKAGE_NAME }}" \\
+        --version-label "Ver-${{ github.sha }}" \
+        --description "CommitSHA-${{ github.sha }}" \
+    
+    - name: Deploy new ElasticBeanstalk Application Version
+      run: |
+        aws elasticbeanstalk update-environment \
+        --environment-name ${{ env.EB_ENVIRONMENT_NAME }} \
+        --version-label "Ver-${{ github.sha }}" 
